@@ -5,10 +5,11 @@ Each example generates realistic synthetic data, runs EM, and prints results
 so you can see exactly how the algorithm discovers hidden structure.
 
 Examples:
-    1. Customer Segmentation  — find distinct spending groups in retail data
-    2. Anomaly Detection      — separate normal network traffic from attacks
-    3. Species Classification — identify plant sub-species from measurements
-    4. Sensor Calibration     — unmix readings from overlapping sensors
+    1. Customer Segmentation   — find distinct spending groups in retail data
+    2. Anomaly Detection       — separate normal network traffic from attacks
+    3. Species Classification  — identify plant sub-species from measurements
+    4. Sensor Calibration      — unmix readings from overlapping sensors
+    5. Medical Diagnostics     — separate healthy and pre-diabetic patients
 
 Run:
     python real_world_examples.py
@@ -27,7 +28,7 @@ def print_header(title, description):
     print(f"\n  Scenario: {description}\n")
 
 
-def print_comparison(true_params, learned_means, learned_stds, learned_weights, labels):
+def print_comparison(true_params, learned_means, learned_stds, learned_weights):
     """Print a side-by-side comparison of ground truth vs learned parameters."""
     order = np.argsort(learned_means)
     learned_means = learned_means[order]
@@ -72,7 +73,7 @@ def example_customer_segmentation():
     print(f"  Customers simulated: {len(data)}")
     print(f"  EM iterations:       {len(lls)}\n")
     print("  Results (spending in $):\n")
-    print_comparison(true_params, means, stds, weights, labels)
+    print_comparison(true_params, means, stds, weights)
 
     print("  Insight: The store can now target each segment with tailored")
     print("  promotions — coupons for budget shoppers, loyalty rewards for")
@@ -108,7 +109,7 @@ def example_anomaly_detection():
     print(f"  Requests simulated: {len(data)}")
     print(f"  EM iterations:      {len(lls)}\n")
     print("  Results (latency in ms):\n")
-    print_comparison(true_params, means, stds, weights, labels)
+    print_comparison(true_params, means, stds, weights)
 
     # Derive a practical threshold
     order = np.argsort(means)
@@ -147,7 +148,7 @@ def example_species_classification():
     print(f"  Flowers measured: {len(data)}")
     print(f"  EM iterations:    {len(lls)}\n")
     print("  Results (petal length in cm):\n")
-    print_comparison(true_params, means, stds, weights, labels)
+    print_comparison(true_params, means, stds, weights)
 
     print("  Insight: The botanist can now assign each flower to a likely")
     print("  sub-species based on which Gaussian component explains its")
@@ -181,7 +182,7 @@ def example_sensor_calibration():
     print(f"  Readings simulated: {len(data)}")
     print(f"  EM iterations:      {len(lls)}\n")
     print("  Results (temperature in °C):\n")
-    print_comparison(true_params, means, stds, weights, labels)
+    print_comparison(true_params, means, stds, weights)
 
     print("  Insight: With the two distributions separated, engineers can")
     print("  detect if either zone drifts from its target temperature and")
@@ -214,7 +215,7 @@ def example_medical_diagnostics():
     print(f"  Patients screened: {len(data)}")
     print(f"  EM iterations:     {len(lls)}\n")
     print("  Results (blood glucose in mg/dL):\n")
-    print_comparison(true_params, means, stds, weights, labels)
+    print_comparison(true_params, means, stds, weights)
 
     order = np.argsort(means)
     risk_mean = means[order[1]]

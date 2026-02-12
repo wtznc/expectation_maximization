@@ -13,6 +13,11 @@ Usage:
 import numpy as np
 import scipy.stats
 
+# Numerical stability constants
+MIN_STD = 0.1       # Minimum allowed standard deviation to prevent degenerate components
+EPSILON = 1e-8      # Small value to prevent division by zero in parameter updates
+MIN_PROB = 1e-300   # Minimum probability to avoid log(0)
+
 
 def expectation_maximization(data, n_components, max_iter=100, tol=1e-6):
     """Fit a Gaussian Mixture Model to 1-D data using the EM algorithm.
@@ -47,7 +52,9 @@ def expectation_maximization(data, n_components, max_iter=100, tol=1e-6):
     quantiles = np.linspace(0, 1, n_components + 2)[1:-1]
     means = np.quantile(data, quantiles)
 
-    stds = np.ones(n_components) * np.std(data) / n_components
+    initial_std = np.std(data) / n_components
+    initial_std = max(initial_std, MIN_STD)  # floor to prevent degenerate components
+    stds = np.ones(n_components) * initial_std
     weights = np.ones(n_components) / n_components  # uniform start
 
     # Responsibility matrix: (n_components, n_data)
@@ -59,14 +66,13 @@ def expectation_maximization(data, n_components, max_iter=100, tol=1e-6):
         for k in range(n_components):
             resp[k] = weights[k] * scipy.stats.norm.pdf(data, means[k], stds[k])
         total = resp.sum(axis=0)
-        total = np.maximum(total, 1e-300)  # avoid division by zero
+        total = np.maximum(total, MIN_PROB)  # avoid division by zero
         resp /= total
 
         # ---- Log-likelihood --------------------------------------------- #
-        ll = np.sum(np.log(np.maximum(
-            sum(weights[k] * scipy.stats.norm.pdf(data, means[k], stds[k])
-                for k in range(n_components)),
-            1e-300)))
+        # Use the already-computed mixture density `total` from the E-step.
+        # `total` has been floored at MIN_PROB, so it is safe to take the log.
+        ll = np.sum(np.log(total))
         log_likelihoods.append(ll)
 
         if len(log_likelihoods) > 1 and abs(log_likelihoods[-1] - log_likelihoods[-2]) < tol:
@@ -74,11 +80,13 @@ def expectation_maximization(data, n_components, max_iter=100, tol=1e-6):
 
         # ---- M-step: update parameters ---------------------------------- #
         Nk = resp.sum(axis=1)  # effective number of points per component
+        # Guard against zero/near-zero Nk to avoid division by zero in parameter updates
+        Nk_safe = np.maximum(Nk, EPSILON)
 
         weights = Nk / n
-        means = (resp * data).sum(axis=1) / Nk
-        stds = np.sqrt((resp * (data - means[:, np.newaxis]) ** 2).sum(axis=1) / Nk)
-        stds = np.maximum(stds, 0.1)  # floor to prevent degenerate components
+        means = (resp * data).sum(axis=1) / Nk_safe
+        stds = np.sqrt((resp * (data - means[:, np.newaxis]) ** 2).sum(axis=1) / Nk_safe)
+        stds = np.maximum(stds, MIN_STD)  # floor to prevent degenerate components
 
     return weights, means, stds, log_likelihoods
 
@@ -108,7 +116,11 @@ def generate_mixture_data(means, stds, weights, n_samples=2000, seed=None):
     """
     rng = np.random.default_rng(seed)
     labels = rng.choice(len(means), size=n_samples, p=weights)
-    data = np.array([rng.normal(means[l], stds[l]) for l in labels])
+    means_arr = np.asarray(means)
+    stds_arr = np.asarray(stds)
+    # Draw all standard normal samples at once and scale/shift per component.
+    z = rng.normal(size=n_samples)
+    data = z * stds_arr[labels] + means_arr[labels]
     return data, labels
 
 
