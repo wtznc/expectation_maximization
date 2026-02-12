@@ -13,6 +13,11 @@ Usage:
 import numpy as np
 import scipy.stats
 
+# Numerical stability constants
+MIN_STD = 0.1       # Minimum allowed standard deviation to prevent degenerate components
+EPSILON = 1e-8      # Small value to prevent division by zero in parameter updates
+MIN_PROB = 1e-300   # Minimum probability to avoid log(0)
+
 
 def expectation_maximization(data, n_components, max_iter=100, tol=1e-6):
     """Fit a Gaussian Mixture Model to 1-D data using the EM algorithm.
@@ -48,7 +53,7 @@ def expectation_maximization(data, n_components, max_iter=100, tol=1e-6):
     means = np.quantile(data, quantiles)
 
     initial_std = np.std(data) / n_components
-    initial_std = max(initial_std, 0.1)  # floor to prevent degenerate components
+    initial_std = max(initial_std, MIN_STD)  # floor to prevent degenerate components
     stds = np.ones(n_components) * initial_std
     weights = np.ones(n_components) / n_components  # uniform start
 
@@ -61,12 +66,12 @@ def expectation_maximization(data, n_components, max_iter=100, tol=1e-6):
         for k in range(n_components):
             resp[k] = weights[k] * scipy.stats.norm.pdf(data, means[k], stds[k])
         total = resp.sum(axis=0)
-        total = np.maximum(total, 1e-300)  # avoid division by zero
+        total = np.maximum(total, MIN_PROB)  # avoid division by zero
         resp /= total
 
         # ---- Log-likelihood --------------------------------------------- #
         # Use the already-computed mixture density `total` from the E-step.
-        # `total` has been floored at 1e-300, so it is safe to take the log.
+        # `total` has been floored at MIN_PROB, so it is safe to take the log.
         ll = np.sum(np.log(total))
         log_likelihoods.append(ll)
 
@@ -76,12 +81,12 @@ def expectation_maximization(data, n_components, max_iter=100, tol=1e-6):
         # ---- M-step: update parameters ---------------------------------- #
         Nk = resp.sum(axis=1)  # effective number of points per component
         # Guard against zero/near-zero Nk to avoid division by zero in parameter updates
-        Nk_safe = np.maximum(Nk, 1e-8)
+        Nk_safe = np.maximum(Nk, EPSILON)
 
         weights = Nk / n
         means = (resp * data).sum(axis=1) / Nk_safe
         stds = np.sqrt((resp * (data - means[:, np.newaxis]) ** 2).sum(axis=1) / Nk_safe)
-        stds = np.maximum(stds, 0.1)  # floor to prevent degenerate components
+        stds = np.maximum(stds, MIN_STD)  # floor to prevent degenerate components
 
     return weights, means, stds, log_likelihoods
 
